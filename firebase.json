@@ -1,0 +1,13 @@
+{
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "InterviewAI",
+        "supportEmail": "keerthana.jayakumar.kjk@gmail.com",
+        "authorizedRedirectUris": [
+          "http://localhost:5173"
+        ]
+      }
+    }
+  }
+}
