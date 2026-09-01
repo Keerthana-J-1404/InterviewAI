@@ -302,6 +302,10 @@
 
 .speech-controls {
   margin-top: 20px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .transcript-box {

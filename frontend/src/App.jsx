@@ -20,6 +20,9 @@ function App() {
   const [transcript, setTranscript] = useState("")
   const recognitionRef = useRef(null)
 
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
+
   const videoRef = useRef(null)
 
   // Text interview state
@@ -267,6 +270,71 @@ function App() {
     setIsListening(false)
   }
 
+  const submitLiveAnswer = async () => {
+  if (!transcript.trim()) {
+    return
+  }
+
+  const currentQuestion = questions[currentQuestionIndex]
+
+  if (!currentQuestion) {
+    console.error("No current question found")
+    return
+  }
+
+  setIsProcessingAnswer(true)
+
+  try {
+    const response = await fetch(
+      "http://127.0.0.1:8000/live-interview/respond",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question: currentQuestion.question,
+          answer: transcript,
+          interview_type: "Mixed",
+          difficulty: currentQuestion.difficulty || "Medium",
+        }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail || "Failed to generate next question"
+      )
+    }
+
+    console.log("Next question:", data.next_question)
+
+    setQuestions((previousQuestions) => [
+      ...previousQuestions,
+      {
+        question: data.next_question,
+        category: "Follow-up",
+        difficulty: currentQuestion.difficulty || "Medium",
+      },
+    ])
+
+    setCurrentQuestionIndex(
+      (previousIndex) => previousIndex + 1
+    )
+
+    setTranscript("")
+
+    speakQuestion(data.next_question)
+
+  } catch (error) {
+    console.error("Live interview error:", error)
+  } finally {
+    setIsProcessingAnswer(false)
+  }
+}
+
   useEffect(() => {
     if (
       liveInterviewStarted &&
@@ -474,21 +542,40 @@ function App() {
                   Listening and preparing your first question...
                 </p>
 
-                {questions.length > 0 && (
+                {questions[currentQuestionIndex] && (
                   <div className="current-question">
-                    <strong>Question 1</strong>
-                    <p>{questions[0].question}</p>
+                    <strong>
+                      Question {currentQuestionIndex + 1}
+                    </strong>
+
+                    <p>
+                      {questions[currentQuestionIndex].question}
+                    </p>
                   </div>
                 )}
 
                 <div className="speech-controls">
                   {!isListening ? (
-                    <button onClick={startListening}>
+                    <button
+                      onClick={startListening}
+                      disabled={isProcessingAnswer}
+                    >
                       🎤 Start Answer
                     </button>
                   ) : (
                     <button onClick={stopListening}>
                       ⏹ Stop Listening
+                    </button>
+                  )}
+
+                  {transcript && !isListening && (
+                    <button
+                      onClick={submitLiveAnswer}
+                      disabled={isProcessingAnswer}
+                    >
+                      {isProcessingAnswer
+                        ? "🤖 Thinking..."
+                        : "➡️ Submit Answer"}
                     </button>
                   )}
                 </div>

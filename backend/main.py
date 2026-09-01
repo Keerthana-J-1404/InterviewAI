@@ -46,6 +46,12 @@ class InterviewRequest(BaseModel):
     difficulty: str
     number_of_questions: int
 
+class LiveInterviewRequest(BaseModel):
+    question: str
+    answer: str
+    interview_type: str = "Mixed"
+    difficulty: str = "Medium"
+
 def get_db():
     db = SessionLocal()
     try:
@@ -245,3 +251,69 @@ def test_gemini():
     return {
         "response": response.text
     }
+
+@app.post("/live-interview/respond")
+def live_interview_respond(request: LiveInterviewRequest):
+    prompt = f"""
+You are an expert AI interviewer conducting a realistic mock interview.
+
+The candidate was asked this question:
+
+{request.question}
+
+The candidate answered:
+
+{request.answer}
+
+Interview type: {request.interview_type}
+Difficulty: {request.difficulty}
+
+Based on the candidate's answer, generate the next appropriate interview question.
+
+Rules:
+- Continue the interview naturally.
+- If the answer is interesting or incomplete, ask a relevant follow-up question.
+- If the answer is sufficient, move to a related topic.
+- Keep the question relevant to the interview type.
+- Match the requested difficulty.
+- Do not evaluate or criticize the candidate.
+- Do not provide feedback.
+- Return ONLY valid JSON.
+
+Return exactly this format:
+
+{{
+    "next_question": "The next interview question"
+}}
+"""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt
+        )
+
+        result = json.loads(response.text)
+
+        if "next_question" not in result:
+            raise HTTPException(
+                status_code=500,
+                detail="Gemini did not return a next question"
+            )
+
+        return result
+
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=500,
+            detail="Gemini did not return valid JSON"
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not generate next question: {str(error)}"
+        )
