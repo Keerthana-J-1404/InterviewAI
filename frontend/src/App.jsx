@@ -193,6 +193,37 @@ function App() {
     }
   }
 
+  const speakQuestion = (questionText) => {
+    if (!("speechSynthesis" in window)) {
+      console.error("Speech synthesis is not supported in this browser.")
+      return
+    }
+
+    window.speechSynthesis.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(questionText)
+
+    utterance.rate = 0.95
+    utterance.pitch = 1
+    utterance.volume = 1
+
+    window.speechSynthesis.speak(utterance)
+  }
+
+  useEffect(() => {
+    if (
+      liveInterviewStarted &&
+      questions.length > 0
+    ) 
+    {
+      const firstQuestion = questions[0]
+
+      if (firstQuestion?.question) {
+        speakQuestion(firstQuestion.question)
+      }
+    }
+  }, [liveInterviewStarted, questions])
+
   useEffect(() => {
     if (videoRef.current && cameraStream) {
       videoRef.current.srcObject = cameraStream
@@ -206,6 +237,7 @@ function App() {
       }
     }
   }, [cameraStream])
+
 
 
   return (
@@ -365,25 +397,55 @@ function App() {
       )}
 
       {liveInterviewStarted && (
-        <section>
-          <h2>Live AI Interview</h2>
+          <section className="live-interview">
+            <div className="live-interview-header">
+              <h2>Live AI Interview</h2>
+              <p>Your interview has started</p>
+            </div>
 
-          <div>
-           <h3>Your Camera</h3>
+            <div className="interview-stage">
 
-            <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            width="500"
-            />
+              {/* AI INTERVIEWER */}
+              <div className="interviewer-panel">
+                <div className="ai-avatar">
+                  🤖
+                </div>
+
+                <h3>AI Interviewer</h3>
+
+                <p className="ai-status">
+                  Listening and preparing your first question...
+                </p>
+
+                {questions.length > 0 && (
+                  <div className="current-question">
+                    <strong>Question 1</strong>
+                    <p>{questions[0].question}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* APPLICANT CAMERA */}
+              <div className="camera-panel">
+              <h3>Your Camera</h3>
+
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+              />
+
+              <div className="media-status">
+                <span>🎤 Microphone: Active</span>
+                <span>📹 Camera: Active</span>
+              </div>
+            </div>
+
           </div>
 
-          <p>🎤 Microphone: Active</p>
-          <p>📹 Camera: Active</p>
-
           <button
+            className="end-interview-button"
             onClick={() => {
               if (cameraStream) {
                 cameraStream.getTracks().forEach((track) => track.stop())
@@ -392,7 +454,7 @@ function App() {
               setCameraStream(null)
               setLiveInterviewStarted(false)
             }}
-          > 
+          >
           End Interview
           </button>
         </section>
