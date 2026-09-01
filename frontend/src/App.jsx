@@ -16,6 +16,10 @@ function App() {
   const [cameraStream, setCameraStream] = useState(null)
   const [cameraError, setCameraError] = useState("")
 
+  const [isListening, setIsListening] = useState(false)
+  const [transcript, setTranscript] = useState("")
+  const recognitionRef = useRef(null)
+
   const videoRef = useRef(null)
 
   // Text interview state
@@ -208,6 +212,59 @@ function App() {
     utterance.volume = 1
 
     window.speechSynthesis.speak(utterance)
+  }
+
+  const startListening = () => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition
+
+    if (!SpeechRecognition) {
+      console.error("Speech recognition is not supported in this browser.")
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = "en-IN"
+
+    recognition.onstart = () => {
+      setIsListening(true)
+      console.log("Speech recognition started")
+    }
+
+    recognition.onresult = (event) => {
+      let spokenText = ""
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        spokenText += event.results[i][0].transcript
+      }
+
+      setTranscript(spokenText)
+    }
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error)
+      setIsListening(false)
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+      console.log("Speech recognition ended")
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+  }
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      recognitionRef.current = null
+    }
+
+    setIsListening(false)
   }
 
   useEffect(() => {
@@ -423,7 +480,27 @@ function App() {
                     <p>{questions[0].question}</p>
                   </div>
                 )}
+
+                <div className="speech-controls">
+                  {!isListening ? (
+                    <button onClick={startListening}>
+                      🎤 Start Answer
+                    </button>
+                  ) : (
+                    <button onClick={stopListening}>
+                      ⏹ Stop Listening
+                    </button>
+                  )}
+                </div>
+
+                {transcript && (
+                  <div className="transcript-box">
+                    <strong>Your Answer</strong>
+                    <p>{transcript}</p>
+                  </div>
+                )}
               </div>
+
 
               {/* APPLICANT CAMERA */}
               <div className="camera-panel">
