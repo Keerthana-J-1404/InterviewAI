@@ -11,6 +11,9 @@ function App() {
   const [interviewType, setInterviewType] = useState("Technical")
   const [difficulty, setDifficulty] = useState("Medium")
   const [numberOfQuestions, setNumberOfQuestions] = useState(5)
+  const [role, setRole] = useState("")
+  const [company, setCompany] = useState("")
+  const [jobDescription, setJobDescription] = useState("")
 
   const [liveInterviewStarted, setLiveInterviewStarted] = useState(false)
   const [cameraStream, setCameraStream] = useState(null)
@@ -18,11 +21,15 @@ function App() {
 
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState("")
+  const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
+  const [liveConversation, setLiveConversation] = useState([])
+  const [liveCurrentQuestion, setLiveCurrentQuestion] = useState(null)
+  const [liveInterviewError, setLiveInterviewError] = useState("")
+  const [isFinalizingInterview, setIsFinalizingInterview] = useState(false)
+  const [finalAnalysis, setFinalAnalysis] = useState(null)
+  const [interviewHistory, setInterviewHistory] = useState([])
+
   const recognitionRef = useRef(null)
-
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
-
   const videoRef = useRef(null)
 
   // Text interview state
@@ -31,6 +38,19 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
   const [answers, setAnswers] = useState([])
   const [textInterviewStarted, setTextInterviewStarted] = useState(false)
   const [textInterviewCompleted, setTextInterviewCompleted] = useState(false)
+
+  const loadInterviewHistory = async (firebaseUid) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/interviews/user/${firebaseUid}`
+      )
+      if (!response.ok) return
+      const data = await response.json()
+      setInterviewHistory(data.interviews || [])
+    } catch (error) {
+      console.error("Interview history failed to load:", error)
+    }
+  }
 
   const handleGoogleLogin = async () => {
     try {
@@ -58,6 +78,7 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
       const data = await response.json()
 
       console.log("Backend response:", data)
+      await loadInterviewHistory(loggedInUser.uid)
     } catch (error) {
       console.error("Login failed:", error)
     }
@@ -179,26 +200,33 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
 
 
   const startLiveInterview = async () => {
-    try {
-      setCameraError("")
+  try {
+    setCameraError("")
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      })
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true,
+    })
 
-      setCameraStream(stream)
-      setLiveInterviewStarted(true)
+    setCameraStream(stream)
+    setLiveInterviewStarted(true)
 
-      console.log("Camera and microphone access granted")
-    } 
-    catch (error) {
-      console.error("Camera/microphone access failed:", error)
-      setCameraError(
-        "Camera and microphone access is required for the live interview."
-      )
-    }
+    setLiveConversation([])
+    setCurrentQuestionIndex(0)
+    setTranscript("")
+    setIsListening(false)
+    setLiveCurrentQuestion(questions[0] || null)
+    setLiveInterviewError("")
+
+    console.log("Camera and microphone access granted")
+  } 
+  catch (error) {
+    console.error("Camera/microphone access failed:", error)
+    setCameraError(
+      "Camera and microphone access is required for the live interview."
+    )
   }
+}
 
   const speakQuestion = (questionText) => {
     if (!("speechSynthesis" in window)) {
@@ -271,18 +299,14 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
   }
 
   const submitLiveAnswer = async () => {
-  if (!transcript.trim()) {
+  if (!transcript.trim() || !liveCurrentQuestion || isProcessingAnswer) {
     return
   }
 
-  const currentQuestion = questions[currentQuestionIndex]
-
-  if (!currentQuestion) {
-    console.error("No current question found")
-    return
-  }
+  const candidateAnswer = transcript.trim()
 
   setIsProcessingAnswer(true)
+  setLiveInterviewError("")
 
   try {
     const response = await fetch(
@@ -293,10 +317,11 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          question: currentQuestion.question,
-          answer: transcript,
-          interview_type: "Mixed",
-          difficulty: currentQuestion.difficulty || "Medium",
+          question: liveCurrentQuestion.question,
+          answer: candidateAnswer,
+          history: liveConversation,
+          interview_type: interviewType,
+          difficulty: liveCurrentQuestion.difficulty || difficulty,
         }),
       }
     )
@@ -309,6 +334,17 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
       )
     }
 
+    const updatedConversation = [
+      ...liveConversation,
+      {
+        question: liveCurrentQuestion.question,
+        answer: candidateAnswer,
+      },
+    ]
+
+    setLiveConversation(updatedConversation)
+
+    console.log("Conversation history:", updatedConversation)
     console.log("Next question:", data.next_question)
 
     setQuestions((previousQuestions) => [
@@ -316,9 +352,15 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
       {
         question: data.next_question,
         category: "Follow-up",
-        difficulty: currentQuestion.difficulty || "Medium",
+        difficulty: liveCurrentQuestion.difficulty || difficulty,
       },
     ])
+
+    setLiveCurrentQuestion({
+      question: data.next_question,
+      category: "Follow-up",
+      difficulty: liveCurrentQuestion.difficulty || difficulty,
+    })
 
     setCurrentQuestionIndex(
       (previousIndex) => previousIndex + 1
@@ -326,28 +368,72 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
 
     setTranscript("")
 
-    speakQuestion(data.next_question)
-
   } catch (error) {
     console.error("Live interview error:", error)
+    setLiveInterviewError(error.message)
   } finally {
     setIsProcessingAnswer(false)
   }
 }
 
-  useEffect(() => {
-    if (
-      liveInterviewStarted &&
-      questions.length > 0
-    ) 
-    {
-      const firstQuestion = questions[0]
+  const finalizeInterview = async () => {
+    if (isFinalizingInterview) return
 
-      if (firstQuestion?.question) {
-        speakQuestion(firstQuestion.question)
+    stopListening()
+    window.speechSynthesis?.cancel()
+    setIsFinalizingInterview(true)
+    setLiveInterviewError("")
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/interviews/finalize",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            firebase_uid: user?.uid || null,
+            resume_analysis: resumeAnalysis,
+            text_questions: questions.slice(0, Number(numberOfQuestions)),
+            text_answers: answers,
+            live_conversation: liveConversation,
+            role: role.trim() || null,
+            company: company.trim() || null,
+            job_description: jobDescription.trim() || null,
+            interview_type: interviewType,
+            difficulty,
+            previous_interview: interviewHistory[0]?.analysis || null,
+          }),
+        }
+      )
+      const data = await response.json()
+
+      if (!response.ok) {
+        const detail = data.detail
+        throw new Error(
+          typeof detail === "string" ? detail : detail?.message || "Final analysis failed"
+        )
       }
+
+      setFinalAnalysis(data)
+      setLiveInterviewStarted(false)
+      await loadInterviewHistory(user?.uid)
+    } catch (error) {
+      console.error("Interview finalization failed:", error)
+      setLiveInterviewError(error.message)
+    } finally {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop())
+      }
+      setCameraStream(null)
+      setIsFinalizingInterview(false)
     }
-  }, [liveInterviewStarted, questions])
+  }
+
+  useEffect(() => {
+    if (liveInterviewStarted && liveCurrentQuestion?.question) {
+      speakQuestion(liveCurrentQuestion.question)
+    }
+  }, [liveInterviewStarted, liveCurrentQuestion])
 
   useEffect(() => {
     if (videoRef.current && cameraStream) {
@@ -455,6 +541,27 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
 
         <br />
 
+        <div className="optional-context">
+          <label>
+            Role (optional)
+            <input value={role} onChange={(event) => setRole(event.target.value)} />
+          </label>
+          <label>
+            Company (optional)
+            <input value={company} onChange={(event) => setCompany(event.target.value)} />
+          </label>
+          <label>
+            Job description (optional)
+            <textarea
+              rows="4"
+              value={jobDescription}
+              onChange={(event) => setJobDescription(event.target.value)}
+            />
+          </label>
+        </div>
+
+        <br />
+
         <button onClick={handleGenerateQuestions}>
           Start Text Interview
         </button>
@@ -542,14 +649,14 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
                   Listening and preparing your first question...
                 </p>
 
-                {questions[currentQuestionIndex] && (
+                {liveCurrentQuestion && (
                   <div className="current-question">
                     <strong>
-                      Question {currentQuestionIndex + 1}
+                      Question {liveConversation.length + 1}
                     </strong>
 
                     <p>
-                      {questions[currentQuestionIndex].question}
+                      {liveCurrentQuestion.question}
                     </p>
                   </div>
                 )}
@@ -586,6 +693,12 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
                     <p>{transcript}</p>
                   </div>
                 )}
+
+                {liveInterviewError && (
+                  <p role="alert" className="live-interview-error">
+                    {liveInterviewError}
+                  </p>
+                )}
               </div>
 
 
@@ -610,17 +723,41 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
 
           <button
             className="end-interview-button"
-            onClick={() => {
-              if (cameraStream) {
-                cameraStream.getTracks().forEach((track) => track.stop())
-              }
-
-              setCameraStream(null)
-              setLiveInterviewStarted(false)
-            }}
+            onClick={finalizeInterview}
+            disabled={isFinalizingInterview || isProcessingAnswer}
           >
-          End Interview
+          {isFinalizingInterview ? "Preparing final report..." : "End Interview"}
           </button>
+        </section>
+      )}
+
+      {finalAnalysis && (
+        <section className="final-report">
+          <h2>Interview Report</h2>
+          <p className="readiness-score">
+            {finalAnalysis.readiness_score}% · {finalAnalysis.readiness_status}
+          </p>
+          <ReportGroup title="Strengths" items={finalAnalysis.analysis?.performance?.strengths} />
+          <ReportGroup title="Areas needing work" items={finalAnalysis.analysis?.performance?.areas_needing_work} />
+          <ReportGroup title="Practice next" items={finalAnalysis.analysis?.improvement?.practice_items} />
+          <p>{finalAnalysis.analysis?.readiness_reasoning}</p>
+        </section>
+      )}
+
+      {interviewHistory.length > 0 && (
+        <section className="interview-history">
+          <h2>Interview History</h2>
+          {interviewHistory.map((interview) => (
+            <article key={interview.id} className="history-entry">
+              <strong>
+                {interview.role || "General preparation"}
+                {interview.company ? ` · ${interview.company}` : ""}
+              </strong>
+              <span>
+                {new Date(interview.created_at).toLocaleDateString()} · {interview.readiness_score ?? "--"}% · {interview.readiness_status || interview.status}
+              </span>
+            </article>
+          ))}
         </section>
       )}
 
@@ -630,6 +767,19 @@ const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
   </section>
 )}
     </main>
+  )
+}
+
+function ReportGroup({ title, items }) {
+  if (!items?.length) return null
+
+  return (
+    <div className="report-group">
+      <h3>{title}</h3>
+      <ul>
+        {items.map((item, index) => <li key={`${title}-${index}`}>{item}</li>)}
+      </ul>
+    </div>
   )
 }
 
