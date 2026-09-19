@@ -3,3 +3,4 @@ __pycache__/
 .env
 node_modules/
 firebase-debug.log
+backend/interviewai-38666-firebase-adminsdk-fbsvc-7dd035bc5b.json
