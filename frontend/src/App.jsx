@@ -3,6 +3,19 @@ import { auth } from "./firebase"
 import { useEffect, useRef, useState } from "react"
 import "./App.css"
 
+const authenticatedFetch = async (url, options = {}) => {
+  const currentUser = auth.currentUser
+  if (!currentUser) {
+    throw new Error("Please sign in before using InterviewAI.")
+  }
+
+  const token = await currentUser.getIdToken()
+  const headers = new Headers(options.headers || {})
+  headers.set("Authorization", `Bearer ${token}`)
+
+  return fetch(url, { ...options, headers })
+}
+
 function App() {
   const [user, setUser] = useState(null)
   const [resumeAnalysis, setResumeAnalysis] = useState(null)
@@ -41,8 +54,8 @@ function App() {
 
   const loadInterviewHistory = async (firebaseUid) => {
     try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/interviews/user/${firebaseUid}`
+      const response = await authenticatedFetch(
+        `http://localhost:8000/interviews/user/${firebaseUid}`
       )
       if (!response.ok) return
       const data = await response.json()
@@ -63,13 +76,12 @@ function App() {
 
       console.log("Logged in user:", loggedInUser)
 
-      const response = await fetch("http://127.0.0.1:8000/users", {
+      const response = await authenticatedFetch("http://localhost:8000/users", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          firebase_uid: loggedInUser.uid,
           name: loggedInUser.displayName || "Unknown",
           email: loggedInUser.email,
         }),
@@ -98,8 +110,8 @@ function App() {
     formData.append("file", file)
 
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/upload-resume",
+      const response = await authenticatedFetch(
+        "http://localhost:8000/upload-resume",
         {
           method: "POST",
           body: formData,
@@ -123,8 +135,8 @@ function App() {
     }
 
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/generate-questions",
+      const response = await authenticatedFetch(
+        "http://localhost:8000/generate-questions",
         {
           method: "POST",
           headers: {
@@ -132,6 +144,7 @@ function App() {
           },
           body: JSON.stringify({
             resume_analysis: resumeAnalysis,
+            job_description: jobDescription,
             interview_type: interviewType,
             difficulty: difficulty,
             number_of_questions: Number(numberOfQuestions),
@@ -215,16 +228,66 @@ function App() {
     setCurrentQuestionIndex(0)
     setTranscript("")
     setIsListening(false)
-    setLiveCurrentQuestion(questions[0] || null)
+    setLiveCurrentQuestion(null)
     setLiveInterviewError("")
+    setIsProcessingAnswer(true)
 
     console.log("Camera and microphone access granted")
-  } 
-  catch (error) {
-    console.error("Camera/microphone access failed:", error)
-    setCameraError(
-      "Camera and microphone access is required for the live interview."
+
+    const response = await authenticatedFetch(
+      "http://localhost:8000/live-interview/start",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text_questions: questions.slice(0, Number(numberOfQuestions)),
+          text_answers: answers,
+          resume_analysis: resumeAnalysis,
+          job_description: jobDescription.trim() || null,
+          role: role.trim() || null,
+          company: company.trim() || null,
+          interview_type: interviewType,
+          difficulty,
+        }),
+      }
     )
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail || "Failed to start live interview"
+      )
+    }
+
+    if (!data.next_question) {
+      throw new Error("No live interview question was returned.")
+    }
+
+    const firstLiveQuestion = {
+      question: data.next_question,
+      category: "Live Interview",
+      difficulty,
+    }
+
+    setLiveCurrentQuestion(firstLiveQuestion)
+
+    console.log("First live question:", data.next_question)
+
+  } catch (error) {
+    console.error("Live interview start failed:", error)
+    setLiveInterviewError(error.message)
+
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop())
+    }
+
+    setCameraStream(null)
+    setLiveInterviewStarted(false)
+  } finally {
+    setIsProcessingAnswer(false)
   }
 }
 
@@ -309,8 +372,8 @@ function App() {
   setLiveInterviewError("")
 
   try {
-    const response = await fetch(
-      "http://127.0.0.1:8000/live-interview/respond",
+    const response = await authenticatedFetch(
+      "http://localhost:8000/live-interview/respond",
       {
         method: "POST",
         headers: {
@@ -320,6 +383,8 @@ function App() {
           question: liveCurrentQuestion.question,
           answer: candidateAnswer,
           history: liveConversation,
+          text_questions: questions.slice(0, Number(numberOfQuestions)),
+          text_answers: answers,
           interview_type: interviewType,
           difficulty: liveCurrentQuestion.difficulty || difficulty,
         }),
@@ -385,13 +450,12 @@ function App() {
     setLiveInterviewError("")
 
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/interviews/finalize",
+      const response = await authenticatedFetch(
+        "http://localhost:8000/interviews/finalize",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            firebase_uid: user?.uid || null,
             resume_analysis: resumeAnalysis,
             text_questions: questions.slice(0, Number(numberOfQuestions)),
             text_answers: answers,
