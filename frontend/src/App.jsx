@@ -43,6 +43,10 @@ function App() {
   const [interviewHistory, setInterviewHistory] = useState([])
 
   const recognitionRef = useRef(null)
+  const transcriptRef = useRef("")
+  const shouldContinueRecognitionRef = useRef(false)
+  const recognitionRestartTimeoutRef = useRef(null)
+  const answerSubmissionRef = useRef(false)
   const videoRef = useRef(null)
 
   // Text interview state
@@ -226,6 +230,7 @@ function App() {
 
     setLiveConversation([])
     setCurrentQuestionIndex(0)
+    transcriptRef.current = ""
     setTranscript("")
     setIsListening(false)
     setLiveCurrentQuestion(null)
@@ -309,64 +314,122 @@ function App() {
   }
 
   const startListening = () => {
+    if (recognitionRef.current || recognitionRestartTimeoutRef.current) {
+      return
+    }
+
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition
 
     if (!SpeechRecognition) {
-      console.error("Speech recognition is not supported in this browser.")
+      setLiveInterviewError("Speech recognition is not supported in this browser.")
       return
     }
 
     const recognition = new SpeechRecognition()
+    const sessionBaseTranscript = transcriptRef.current.trim()
 
     recognition.continuous = true
     recognition.interimResults = true
     recognition.lang = "en-IN"
 
     recognition.onstart = () => {
-      setIsListening(true)
-      console.log("Speech recognition started")
+      if (recognitionRef.current === recognition) {
+        setIsListening(true)
+        console.log("Speech recognition started")
+      }
     }
 
     recognition.onresult = (event) => {
-      let spokenText = ""
+      if (recognitionRef.current !== recognition) return
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        spokenText += event.results[i][0].transcript
-      }
+      const spokenText = Array.from(event.results)
+        .map((result) => result[0]?.transcript.trim())
+        .filter(Boolean)
+        .join(" ")
+      const nextTranscript = [sessionBaseTranscript, spokenText]
+        .filter(Boolean)
+        .join(" ")
 
-      setTranscript(spokenText)
+      transcriptRef.current = nextTranscript
+      setTranscript(nextTranscript)
     }
 
     recognition.onerror = (event) => {
       console.error("Speech recognition error:", event.error)
-      setIsListening(false)
+      if (event.error !== "no-speech") {
+        shouldContinueRecognitionRef.current = false
+        setIsListening(false)
+      }
     }
 
     recognition.onend = () => {
-      setIsListening(false)
       console.log("Speech recognition ended")
+
+      if (recognitionRef.current !== recognition) return
+      recognitionRef.current = null
+
+      if (!shouldContinueRecognitionRef.current) {
+        setIsListening(false)
+        return
+      }
+
+      recognitionRestartTimeoutRef.current = window.setTimeout(() => {
+        recognitionRestartTimeoutRef.current = null
+        if (shouldContinueRecognitionRef.current) {
+          startListening()
+        }
+      }, 250)
     }
 
     recognitionRef.current = recognition
-    recognition.start()
+    shouldContinueRecognitionRef.current = true
+
+    try {
+      recognition.start()
+    } catch (error) {
+      recognitionRef.current = null
+      shouldContinueRecognitionRef.current = false
+      setIsListening(false)
+      console.error("Could not start speech recognition:", error)
+    }
   }
 
   const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      recognitionRef.current = null
+    shouldContinueRecognitionRef.current = false
+
+    if (recognitionRestartTimeoutRef.current) {
+      window.clearTimeout(recognitionRestartTimeoutRef.current)
+      recognitionRestartTimeoutRef.current = null
     }
 
-    setIsListening(false)
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch (error) {
+        recognitionRef.current = null
+        setIsListening(false)
+        console.error("Could not stop speech recognition:", error)
+      }
+    } else {
+      setIsListening(false)
+    }
   }
 
   const submitLiveAnswer = async () => {
-  if (!transcript.trim() || !liveCurrentQuestion || isProcessingAnswer) {
+  const candidateAnswer = transcriptRef.current.trim()
+
+  if (
+    answerSubmissionRef.current ||
+    !candidateAnswer ||
+    !liveCurrentQuestion ||
+    isProcessingAnswer
+  ) {
     return
   }
 
-  const candidateAnswer = transcript.trim()
+  answerSubmissionRef.current = true
+  stopListening()
 
   setIsProcessingAnswer(true)
   setLiveInterviewError("")
@@ -412,6 +475,11 @@ function App() {
     console.log("Conversation history:", updatedConversation)
     console.log("Next question:", data.next_question)
 
+    if (data.interview_complete) {
+      await finalizeInterview(updatedConversation)
+      return
+    }
+
     setQuestions((previousQuestions) => [
       ...previousQuestions,
       {
@@ -431,17 +499,19 @@ function App() {
       (previousIndex) => previousIndex + 1
     )
 
+    transcriptRef.current = ""
     setTranscript("")
 
   } catch (error) {
     console.error("Live interview error:", error)
     setLiveInterviewError(error.message)
   } finally {
+    answerSubmissionRef.current = false
     setIsProcessingAnswer(false)
   }
 }
 
-  const finalizeInterview = async () => {
+  const finalizeInterview = async (conversationToFinalize = liveConversation) => {
     if (isFinalizingInterview) return
 
     stopListening()
@@ -459,7 +529,7 @@ function App() {
             resume_analysis: resumeAnalysis,
             text_questions: questions.slice(0, Number(numberOfQuestions)),
             text_answers: answers,
-            live_conversation: liveConversation,
+            live_conversation: conversationToFinalize,
             role: role.trim() || null,
             company: company.trim() || null,
             job_description: jobDescription.trim() || null,

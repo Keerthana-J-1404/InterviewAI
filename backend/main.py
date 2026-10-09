@@ -630,6 +630,7 @@ Return ONLY valid JSON:
         raise
 
     except Exception as error:
+        print("🔥 LIVE GEMINI ERROR:", repr(error))
         error_text = str(error)
 
         if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
