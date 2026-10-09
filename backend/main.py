@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 from datetime import datetime
@@ -23,6 +24,9 @@ from . import models
 
 
 load_dotenv(Path(__file__).parent / ".env")
+
+logger = logging.getLogger(__name__)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
@@ -289,10 +293,25 @@ Resume:
 {resume_text}
 """
 
-        response = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=prompt
-        )
+        try:
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt
+            )
+        except Exception as error:
+            error_text = str(error)
+            api_key = os.getenv("GEMINI_API_KEY")
+            if api_key:
+                error_text = error_text.replace(api_key, "[REDACTED]")
+            logger.error(
+                "Gemini resume analysis failed: model=%s type=%s status=%s code=%s error=%s",
+                GEMINI_MODEL,
+                type(error).__name__,
+                getattr(error, "status_code", None),
+                getattr(error, "code", None),
+                error_text,
+            )
+            raise
 
         try:
             analysis = parse_gemini_json(response.text)
@@ -324,7 +343,7 @@ Resume:
             )
         raise HTTPException(
             status_code=500,
-            detail=f"Could not analyze resume: {error_text}"
+            detail="Could not analyze resume. Please try again."
         )
 
 @app.post("/generate-questions")
