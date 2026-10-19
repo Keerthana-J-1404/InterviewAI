@@ -4,8 +4,7 @@ An AI-powered mock interview platform for students. Upload your resume, answer q
 
 > **Status:** early-stage prototype. Sign-in, resume analysis and the text interview work. The live interview is implemented but not yet reliable (see [Live interview status](#live-interview-status)). Final analysis and readiness scoring are planned (see [Roadmap](#roadmap)).
 
-**Live demo:** _TODO: add Vercel URL_ · **Screenshots:** _TODO: add 2–3 images to `docs/`_
-
+**Project status:** Early-stage prototype. Live deployment and screenshots will be added as the project develops.
 ---
 
 ## How it works
@@ -182,7 +181,3 @@ For Render, set the same variables in the service environment. Prefer the indivi
 
 - `.env` files and service-account JSON files are git-ignored. Rotate any key that has ever been committed.
 - Resumes and interview answers are personal data. Treat database and API access accordingly.
-
-## License
-
-_TODO: choose a license (MIT is the usual default for portfolio projects) or state "All rights reserved"._
