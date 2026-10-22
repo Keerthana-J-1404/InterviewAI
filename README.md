@@ -1,6 +1,6 @@
 # InterviewAI
 
-An AI-powered mock interview platform for students. Upload your resume, answer questions generated from your own experience, then practise in a live camera-and-microphone interview. The goal is feedback you can act on: what you did well, what to fix, and whether you are actually ready for the role.
+An AI-powered mock interview platform for students and job seekers. Upload your resume, answer questions generated from your own experience, then practise in a live camera-and-microphone interview. The goal is feedback you can act on: what you did well, what to fix, and whether you are actually ready for the role.
 
 > **Status:** early-stage prototype. Sign-in, resume analysis and the text interview work. The live interview is implemented but not yet reliable (see [Live interview status](#live-interview-status)). Final analysis and readiness scoring are planned (see [Roadmap](#roadmap)).
 
