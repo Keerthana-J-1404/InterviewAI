@@ -586,181 +586,263 @@ function App() {
 
 
   return (
-    <main>
-      <h1>InterviewAI</h1>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <a className="brand" href="#dashboard" aria-label="InterviewAI dashboard">
+          <span className="brand-mark" aria-hidden="true">I</span>
+          <span>Interview<span className="brand-accent">AI</span></span>
+        </a>
+        <nav className="sidebar-nav" aria-label="Main navigation">
+          <a className="nav-link active" href="#dashboard">
+            <span aria-hidden="true">⌂</span> Dashboard
+          </a>
+          <a className="nav-link" href="#resume">
+            <span aria-hidden="true">▤</span> Resume
+          </a>
+          <a className="nav-link" href="#settings">
+            <span aria-hidden="true">✦</span> Interview setup
+          </a>
+          {interviewHistory.length > 0 && (
+            <a className="nav-link" href="#history">
+              <span aria-hidden="true">◷</span> Interview history
+            </a>
+          )}
+        </nav>
+        <div className="sidebar-note">
+          <span className="sidebar-note-icon" aria-hidden="true">✦</span>
+          <p>Build confidence, one interview at a time.</p>
+        </div>
+      </aside>
 
-      {/* SIGN IN */}
+      <main className="app-main" id="dashboard">
+        <header className="page-header">
+          <div className="welcome-copy">
+            <p className="eyebrow">YOUR PREPARATION SPACE</p>
+            <h1>{user?.displayName ? `Welcome back, ${user.displayName.split(" ")[0]}` : "Prepare for your next opportunity"}</h1>
+            <p>Practice with purpose and feel ready for what comes next.</p>
+          </div>
+          <div className="account-summary">
+            <span className="account-avatar" aria-hidden="true">
+              {user?.displayName?.charAt(0) || user?.email?.charAt(0) || "G"}
+            </span>
+            <span className="account-copy">
+              <strong>{user?.displayName || (user ? "Signed in" : "Guest")}</strong>
+              <span>{user?.email || "Sign in to get started"}</span>
+            </span>
+          </div>
+        </header>
 
-      <section>
-        <h2>1. Sign in</h2>
+        <div className="dashboard-grid">
+          <div className="dashboard-primary">
+            <section className="dashboard-card" id="settings" aria-labelledby="settings-title">
+              <div className="card-heading">
+                <span className="step-marker">02</span>
+                <div>
+                  <p className="eyebrow">MAKE IT YOURS</p>
+                  <h2 id="settings-title">Configure your interview</h2>
+                </div>
+              </div>
+              <p className="card-description">Tailor a practice session to the role you have in mind.</p>
 
-        {user ? (
-          <p>Signed in as {user.email}</p>
-        ) : (
-          <button onClick={handleGoogleLogin}>
-            Sign in with Google
-          </button>
+              <div className="settings-grid">
+                <label className="form-field" htmlFor="interview-type">
+                  <span>Interview type</span>
+                  <select
+                    id="interview-type"
+                    value={interviewType}
+                    onChange={(event) => setInterviewType(event.target.value)}
+                  >
+                    <option>Technical</option>
+                    <option>HR</option>
+                    <option>Mixed</option>
+                  </select>
+                </label>
+                <label className="form-field" htmlFor="interview-difficulty">
+                  <span>Difficulty</span>
+                  <select
+                    id="interview-difficulty"
+                    value={difficulty}
+                    onChange={(event) => setDifficulty(event.target.value)}
+                  >
+                    <option>Easy</option>
+                    <option>Medium</option>
+                    <option>Hard</option>
+                  </select>
+                </label>
+                <label className="form-field" htmlFor="question-count">
+                  <span>Number of questions</span>
+                  <select
+                    id="question-count"
+                    value={numberOfQuestions}
+                    onChange={(event) => setNumberOfQuestions(event.target.value)}
+                  >
+                    <option value="3">3 questions</option>
+                    <option value="5">5 questions</option>
+                    <option value="10">10 questions</option>
+                  </select>
+                </label>
+                <label className="form-field" htmlFor="role-input">
+                  <span>Role <small>Optional</small></span>
+                  <input id="role-input" value={role} onChange={(event) => setRole(event.target.value)} placeholder="e.g. Product designer" />
+                </label>
+                <label className="form-field" htmlFor="company-input">
+                  <span>Company <small>Optional</small></span>
+                  <input id="company-input" value={company} onChange={(event) => setCompany(event.target.value)} placeholder="e.g. Acme Inc." />
+                </label>
+              </div>
+              <label className="form-field job-description-field" htmlFor="job-description">
+                <span>Job description <small>Optional</small></span>
+                <textarea
+                  id="job-description"
+                  rows="4"
+                  value={jobDescription}
+                  onChange={(event) => setJobDescription(event.target.value)}
+                  placeholder="Paste the role description to personalize your interview..."
+                />
+              </label>
+              <div className="primary-action-row">
+                <button className="button button-primary" onClick={handleGenerateQuestions}>
+                  Generate interview questions
+                  <span aria-hidden="true">→</span>
+                </button>
+                {!resumeAnalysis && <span className="action-hint">Upload a resume to get started</span>}
+              </div>
+            </section>
+          </div>
+
+          <aside className="dashboard-secondary" aria-label="Resume, account, and recent activity">
+            <section className="dashboard-card resume-card" id="resume" aria-labelledby="resume-title">
+              <div className="card-heading">
+                <span className="step-marker">01</span>
+                <div>
+                  <p className="eyebrow">YOUR EXPERIENCE</p>
+                  <h2 id="resume-title">Add your resume</h2>
+                </div>
+              </div>
+              <p className="card-description">Upload a PDF so your practice questions can reflect your experience.</p>
+              <label className="upload-field" htmlFor="resume-upload">
+                <span className="upload-icon" aria-hidden="true">↑</span>
+                <span>
+                  <strong>Choose a resume PDF</strong>
+                  <small>PDF format</small>
+                </span>
+                <input
+                  id="resume-upload"
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleResumeUpload}
+                />
+              </label>
+              {resumeAnalysis && (
+                <p className="status-message" role="status">
+                  <span aria-hidden="true">✓</span> Resume analyzed successfully
+                </p>
+              )}
+            </section>
+            {!user && (
+              <section className="dashboard-card sign-in-card" aria-labelledby="sign-in-title">
+                <div className="card-heading">
+                  <span className="step-marker">01</span>
+                  <div>
+                    <p className="eyebrow">GET STARTED</p>
+                    <h2 id="sign-in-title">Sign in to InterviewAI</h2>
+                  </div>
+                </div>
+                <p className="card-description">Use your Google account to save your interview preparation and history.</p>
+                <button className="button button-secondary" onClick={handleGoogleLogin}>
+                  <span className="google-mark" aria-hidden="true">G</span>
+                  Sign in with Google
+                </button>
+              </section>
+            )}
+            {user && (
+              <section className="dashboard-card account-card" aria-labelledby="account-title">
+                <p className="eyebrow">YOUR ACCOUNT</p>
+                <h2 id="account-title">You're all set</h2>
+                <p className="card-description">Your interview preparation is linked to your Google account.</p>
+                <div className="account-detail">
+                  <span className="account-avatar" aria-hidden="true">
+                    {user?.displayName?.charAt(0) || user?.email?.charAt(0) || "G"}
+                  </span>
+                  <span className="account-copy">
+                    <strong>{user.displayName || "Signed in"}</strong>
+                    <span>{user.email}</span>
+                  </span>
+                </div>
+              </section>
+            )}
+            {interviewHistory.length > 0 && (
+              <section className="dashboard-card interview-history" id="history">
+                <div className="history-heading">
+                  <div>
+                    <p className="eyebrow">YOUR PROGRESS</p>
+                    <h2>Interview history</h2>
+                  </div>
+                  <span className="history-icon" aria-hidden="true">◷</span>
+                </div>
+                {interviewHistory.map((interview) => (
+                  <article key={interview.id} className="history-entry">
+                    <strong>
+                      {interview.role || "General preparation"}
+                      {interview.company ? ` · ${interview.company}` : ""}
+                    </strong>
+                    <span>
+                      {new Date(interview.created_at).toLocaleDateString()} · {interview.readiness_score ?? "--"}% · {interview.readiness_status || interview.status}
+                    </span>
+                  </article>
+                ))}
+              </section>
+            )}
+            {finalAnalysis && (
+              <section className="dashboard-card final-report" aria-labelledby="report-title">
+                <p className="eyebrow">LATEST RESULT</p>
+                <h2 id="report-title">Interview report</h2>
+                <p className="readiness-score">
+                  {finalAnalysis.readiness_score}% · {finalAnalysis.readiness_status}
+                </p>
+                <ReportGroup title="Strengths" items={finalAnalysis.analysis?.performance?.strengths} />
+                <ReportGroup title="Areas needing work" items={finalAnalysis.analysis?.performance?.areas_needing_work} />
+                <ReportGroup title="Practice next" items={finalAnalysis.analysis?.improvement?.practice_items} />
+                <p>{finalAnalysis.analysis?.readiness_reasoning}</p>
+              </section>
+            )}
+          </aside>
+        </div>
+
+        {/* TEXT INTERVIEW */}
+
+        {textInterviewStarted && questions.length > 0 && (
+          <section className="dashboard-card interview-step-card" aria-labelledby="text-interview-title">
+            <p className="eyebrow">QUESTION {currentQuestionIndex + 1} OF {questions.length}</p>
+            <h2 id="text-interview-title">Your text interview</h2>
+            <h3>{questions[currentQuestionIndex].question}</h3>
+            <p className="question-category">Category: {questions[currentQuestionIndex].category}</p>
+            <label className="form-field" htmlFor="text-answer">
+              <span>Your answer</span>
+              <textarea
+                id="text-answer"
+                rows="8"
+                placeholder="Type your answer here..."
+                value={currentAnswer}
+                onChange={(event) => setCurrentAnswer(event.target.value)}
+              />
+            </label>
+            <button className="button button-primary" onClick={handleSubmitAnswer}>
+              {currentQuestionIndex === questions.length - 1 ? "Finish text interview" : "Submit answer"}
+            </button>
+          </section>
         )}
-      </section>
 
-      {/* RESUME */}
-
-      <section>
-        <h2>2. Upload Resume</h2>
-
-        <input
-          type="file"
-          accept="application/pdf"
-          onChange={handleResumeUpload}
-        />
-
-        {resumeAnalysis && (
-          <p>Resume analyzed successfully!</p>
+        {textInterviewCompleted && (
+          <section className="dashboard-card completion-card">
+            <p className="eyebrow">TEXT INTERVIEW COMPLETE</p>
+            <h2>Nice work completing your answers</h2>
+            <p className="card-description">You answered all {answers.length} questions. Continue when you're ready for the live interview.</p>
+            <button className="button button-primary" onClick={startLiveInterview}>
+              Continue to live interview <span aria-hidden="true">→</span>
+            </button>
+          </section>
         )}
-      </section>
-
-      {/* INTERVIEW SETTINGS */}
-
-      <section>
-        <h2>3. Interview Settings</h2>
-
-        <div>
-          <label>Interview Type: </label>
-
-          <select
-            value={interviewType}
-            onChange={(event) =>
-              setInterviewType(event.target.value)
-            }
-          >
-            <option>Technical</option>
-            <option>HR</option>
-            <option>Mixed</option>
-          </select>
-        </div>
-
-        <br />
-
-        <div>
-          <label>Difficulty: </label>
-
-          <select
-            value={difficulty}
-            onChange={(event) =>
-              setDifficulty(event.target.value)
-            }
-          >
-            <option>Easy</option>
-            <option>Medium</option>
-            <option>Hard</option>
-          </select>
-        </div>
-
-        <br />
-
-        <div>
-          <label>Number of Questions: </label>
-
-          <select
-            value={numberOfQuestions}
-            onChange={(event) =>
-              setNumberOfQuestions(event.target.value)
-            }
-          >
-            <option value="3">3</option>
-            <option value="5">5</option>
-            <option value="10">10</option>
-          </select>
-        </div>
-
-        <br />
-
-        <div className="optional-context">
-          <label>
-            Role (optional)
-            <input value={role} onChange={(event) => setRole(event.target.value)} />
-          </label>
-          <label>
-            Company (optional)
-            <input value={company} onChange={(event) => setCompany(event.target.value)} />
-          </label>
-          <label>
-            Job description (optional)
-            <textarea
-              rows="4"
-              value={jobDescription}
-              onChange={(event) => setJobDescription(event.target.value)}
-            />
-          </label>
-        </div>
-
-        <br />
-
-        <button onClick={handleGenerateQuestions}>
-          Start Text Interview
-        </button>
-      </section>
-
-      {/* TEXT INTERVIEW */}
-
-      {textInterviewStarted && questions.length > 0 && (
-        <section>
-          <h2>4. Text Interview</h2>
-
-          <p>
-            Question {currentQuestionIndex + 1} of{" "}
-            {questions.length}
-          </p>
-
-          <h3>
-            {questions[currentQuestionIndex].question}
-          </h3>
-
-          <p>
-            Category:{" "}
-            {questions[currentQuestionIndex].category}
-          </p>
-
-          <textarea
-            rows="8"
-            cols="60"
-            placeholder="Type your answer here..."
-            value={currentAnswer}
-            onChange={(event) =>
-              setCurrentAnswer(event.target.value)
-            }
-          />
-
-          <br />
-          <br />
-
-          <button onClick={handleSubmitAnswer}>
-            {currentQuestionIndex === questions.length - 1
-              ? "Finish Text Interview"
-              : "Submit Answer"}
-          </button>
-        </section>
-      )}
-
-      {/* COMPLETED */}
-
-      {textInterviewCompleted && (
-        <section>
-          <h2>Text Interview Completed ✅</h2>
-
-          <p>
-            You answered all {answers.length} questions.
-          </p>
-
-          <p>
-            Next stage: Live AI Video Interview
-          </p>
-
-          <button onClick={startLiveInterview}>
-            Continue to Live Interview
-          </button>
-        </section>
-      )}
 
       {liveInterviewStarted && (
           <section className="live-interview">
@@ -865,42 +947,13 @@ function App() {
         </section>
       )}
 
-      {finalAnalysis && (
-        <section className="final-report">
-          <h2>Interview Report</h2>
-          <p className="readiness-score">
-            {finalAnalysis.readiness_score}% · {finalAnalysis.readiness_status}
-          </p>
-          <ReportGroup title="Strengths" items={finalAnalysis.analysis?.performance?.strengths} />
-          <ReportGroup title="Areas needing work" items={finalAnalysis.analysis?.performance?.areas_needing_work} />
-          <ReportGroup title="Practice next" items={finalAnalysis.analysis?.improvement?.practice_items} />
-          <p>{finalAnalysis.analysis?.readiness_reasoning}</p>
+      {cameraError && (
+        <section className="dashboard-card camera-error" role="alert">
+          <p>{cameraError}</p>
         </section>
       )}
-
-      {interviewHistory.length > 0 && (
-        <section className="interview-history">
-          <h2>Interview History</h2>
-          {interviewHistory.map((interview) => (
-            <article key={interview.id} className="history-entry">
-              <strong>
-                {interview.role || "General preparation"}
-                {interview.company ? ` · ${interview.company}` : ""}
-              </strong>
-              <span>
-                {new Date(interview.created_at).toLocaleDateString()} · {interview.readiness_score ?? "--"}% · {interview.readiness_status || interview.status}
-              </span>
-            </article>
-          ))}
-        </section>
-      )}
-
-{cameraError && (
-  <section>
-    <p>{cameraError}</p>
-  </section>
-)}
-    </main>
+      </main>
+    </div>
   )
 }
 
