@@ -720,23 +720,33 @@ function App() {
                 </div>
               </div>
               <p className="card-description">Upload a PDF so your practice questions can reflect your experience.</p>
-              <label className="upload-field" htmlFor="resume-upload">
-                <span className="upload-icon" aria-hidden="true">↑</span>
-                <span>
-                  <strong>Choose a resume PDF</strong>
-                  <small>PDF format</small>
-                </span>
-                <input
-                  id="resume-upload"
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleResumeUpload}
-                />
-              </label>
-              {resumeAnalysis && (
-                <p className="status-message" role="status">
-                  <span aria-hidden="true">✓</span> Resume analyzed successfully
-                </p>
+              {resumeAnalysis ? (
+                <div className="upload-field upload-field-success" role="status" aria-live="polite">
+                  <span className="upload-icon upload-success-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="m8 12 2.5 2.5L16 9" />
+                    </svg>
+                  </span>
+                  <span>
+                    <strong>Resume analyzed successfully</strong>
+                    <small>PDF analyzed and ready</small>
+                  </span>
+                </div>
+              ) : (
+                <label className="upload-field" htmlFor="resume-upload">
+                  <span className="upload-icon" aria-hidden="true">↑</span>
+                  <span>
+                    <strong>Choose a resume PDF</strong>
+                    <small>PDF format</small>
+                  </span>
+                  <input
+                    id="resume-upload"
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleResumeUpload}
+                  />
+                </label>
               )}
             </section>
             {!user && (
